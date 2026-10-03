@@ -3,7 +3,7 @@ import Lenis from 'lenis';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-import { allMedia, photos, videos } from './data/mediaLoader';
+import { photos, videos } from './data/mediaLoader';
 
 import LoadingScreen from './components/LoadingScreen';
 import Navbar from './components/Navbar';
@@ -13,24 +13,31 @@ import Hero from './sections/Hero';
 import Introduction from './sections/Introduction';
 import Memories from './sections/Memories';
 import Motion from './sections/Motion';
-import Timeline from './sections/Timeline';
-import HorizontalGallery from './components/HorizontalGallery';
-import ScrollVelocityRotation from './components/ScrollVelocityRotation';
-import QuoteSection from './components/QuoteSection';
-import MaskTransitionsSection from './components/MaskTransitionsSection';
-import StoryBirthdaySection from './components/StoryBirthdaySection';
+import Birthday from './sections/Birthday';
 import FinalSection from './sections/FinalSection';
 
-// Code-split unified fullscreen media lightbox (Section 20 & 34)
-const MediaLightbox = lazy(() => import('./components/MediaLightbox'));
+// Code-split dedicated fullscreen lightboxes (Requirements 2, 3, 15)
+const PhotoLightbox = lazy(() => import('./components/PhotoLightbox'));
+const VideoLightbox = lazy(() => import('./components/VideoLightbox'));
+
+// Code-split Secret Memory Room components (Requirements 1, 2, 6)
+const SecretLockModal = lazy(() => import('./components/SecretRoom/SecretLockModal'));
+const SecretRoom = lazy(() => import('./components/SecretRoom/SecretRoom'));
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function App() {
   const [loading, setLoading] = useState(true);
-  const [activeMedia, setActiveMedia] = useState(null);
 
-  // Single unified smooth scroll instance (Section 18)
+  // Dedicated, strictly separated media states (Zero crossover)
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+
+  // Secret Memory Room state
+  const [isSecretLockOpen, setIsSecretLockOpen] = useState(false);
+  const [isSecretRoomOpen, setIsSecretRoomOpen] = useState(false);
+
+  // Single unified smooth scroll instance with global reference
   useEffect(() => {
     if (loading) return;
 
@@ -43,10 +50,12 @@ export default function App() {
       orientation: 'vertical',
       gestureOrientation: 'vertical',
       smoothWheel: true,
+      syncTouch: true,
       wheelMultiplier: 1.0,
-      touchMultiplier: 1.5,
+      touchMultiplier: 1.0,
     });
 
+    window.lenis = lenis;
     lenis.on('scroll', ScrollTrigger.update);
 
     const tickerCb = (time) => {
@@ -60,80 +69,164 @@ export default function App() {
       ScrollTrigger.refresh();
     }, 300);
 
+    // Initial and hash change navigation
+    const handleHashNavigation = () => {
+      const rawHash = window.location.hash;
+      if (!rawHash) return;
+      const targetSelector = rawHash === '#moments' ? '#memories' : rawHash;
+      const targetEl = document.querySelector(targetSelector);
+      if (targetEl) {
+        setTimeout(() => {
+          if (window.lenis) {
+            window.lenis.scrollTo(targetEl, { offset: 0, duration: 1.2 });
+          } else {
+            targetEl.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 150);
+      }
+    };
+
+    handleHashNavigation();
+    window.addEventListener('hashchange', handleHashNavigation);
+
     return () => {
       clearTimeout(refreshTimer);
+      window.removeEventListener('hashchange', handleHashNavigation);
       gsap.ticker.remove(tickerCb);
       lenis.destroy();
+      window.lenis = null;
     };
   }, [loading]);
 
+  // Master Modal Scroll Lock: locks body scroll & pauses Lenis when any modal is open
+  useEffect(() => {
+    const isAnyModalOpen =
+      Boolean(selectedPhoto) ||
+      Boolean(selectedVideo) ||
+      isSecretLockOpen ||
+      isSecretRoomOpen;
+
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+      if (window.lenis) window.lenis.stop();
+    } else {
+      document.body.style.overflow = '';
+      if (window.lenis) window.lenis.start();
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      if (window.lenis) window.lenis.start();
+    };
+  }, [selectedPhoto, selectedVideo, isSecretLockOpen, isSecretRoomOpen]);
+
   const handleBirthdayScroll = () => {
-    const el = document.querySelector('#birthday-story');
+    const el = document.querySelector('#birthday');
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+      if (window.lenis) {
+        window.lenis.scrollTo(el, { offset: 0, duration: 1.2 });
+      } else {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
+  // Secret Room Handlers
+  const handleOpenSecretLock = () => {
+    setIsSecretLockOpen(true);
+  };
+
+  const handleSecretUnlocked = () => {
+    setIsSecretLockOpen(false);
+    setIsSecretRoomOpen(true);
+  };
+
+  const handleCloseSecretLock = () => {
+    setIsSecretLockOpen(false);
+  };
+
+  const handleLockSecretRoom = () => {
+    setIsSecretRoomOpen(false);
+    setIsSecretLockOpen(false);
+  };
+
   return (
-    <div className="relative min-h-screen bg-[#09090b] text-[#f7f3eb] font-sans antialiased selection:bg-gold selection:text-black overflow-x-hidden">
-      {/* High-Performance Film Grain (Section 31) */}
+    <div className="relative min-h-[100svh] w-full bg-[#09090b] text-[#f7f3eb] font-sans antialiased selection:bg-gold selection:text-black overflow-x-hidden">
+      {/* High-Performance Film Grain */}
       <div className="film-grain" />
 
-      {/* Memory Counter & Dynamic Scroll Progress (Section 13, 30) */}
-      {!loading && <ScrollProgress />}
+      {/* Dynamic Scroll Progress */}
+      {!loading && !isSecretRoomOpen && <ScrollProgress />}
 
-      {/* Cinematic Loading Screen for Sanjana (Section 1) */}
+      {/* Cinematic Loading Screen */}
       {loading ? (
         <LoadingScreen onComplete={() => setLoading(false)} />
       ) : (
         <>
-          {/* Floating Navigation Header (Section 35) */}
-          <Navbar onBirthdayClick={handleBirthdayScroll} />
+          {/* Floating Navigation Header (with 5-click easter egg) */}
+          <Navbar
+            onBirthdayClick={handleBirthdayScroll}
+            onOpenSecretLock={handleOpenSecretLock}
+          />
 
-          {/* Main Experience */}
+          {/* Main Experience — FINAL FLOW */}
           <main className="relative z-10 w-full overflow-hidden">
-            {/* 1. Optimized Hero (Section 14 & 23) */}
-            <Hero onSelectPhoto={setActiveMedia} />
+            {/* 1. HERO — unique photo: heroPhoto (index 0) */}
+            <Hero onSelectPhoto={setSelectedPhoto} />
 
-            {/* 2. Introduction & Morph (Section 6, 7) */}
-            <Introduction onSelectPhoto={setActiveMedia} />
+            {/* 2. INTRODUCTION — unique photo: introPhoto (index 1) */}
+            <Introduction onSelectPhoto={setSelectedPhoto} />
 
-            {/* 3. Redesigned Ultra-Smooth Virtualized Memories Stack (Section 3, 4, 5, 6, 24, 30) */}
-            <Memories onSelectPhoto={setActiveMedia} />
+            {/* 3. MOMENTS — unique gallery photos only (indices 2..N-3) */}
+            <Memories onSelectPhoto={setSelectedPhoto} />
 
-            {/* 4. Living Motion Video Archive (Section 9, 16, 17, 28) */}
-            <Motion onSelectVideo={setActiveMedia} />
+            {/* 4. MOTION — all videos only, strictly separated */}
+            <Motion onSelectVideo={setSelectedVideo} />
 
-            {/* 5. Interwoven Living Timeline: Photo + Video Story (Section 12, 14, 29) */}
-            <Timeline onSelectMedia={setActiveMedia} />
+            {/* 5. BIRTHDAY — unique photo: birthdayPhoto (index N-2) */}
+            <Birthday onSelectPhoto={setSelectedPhoto} />
 
-            {/* 6. Horizontal Editorial Runway Strip (Section 10, 21) */}
-            <HorizontalGallery onSelectPhoto={setActiveMedia} />
-
-            {/* 7. Velocity-Driven Angular Physics */}
-            <ScrollVelocityRotation onSelectPhoto={setActiveMedia} />
-
-            {/* 8. Minimal Quote & Color Transitions (Section 15, 16) */}
-            <QuoteSection />
-
-            {/* 9. Image Mask Transitions (Section 17) */}
-            <MaskTransitionsSection onSelectPhoto={setActiveMedia} />
-
-            {/* 10. Scrapbook & Birthday Dedication for Sanjana */}
-            <StoryBirthdaySection onSelectPhoto={setActiveMedia} />
-
-            {/* 11. Concluding Fullscreen Zoom & Epilogue for Sanjana (Section 21, 22) */}
-            <FinalSection onSelectPhoto={setActiveMedia} />
+            {/* 6. FINAL MESSAGE — unique photo: finalPhoto (index N-1) */}
+            <FinalSection onSelectPhoto={setSelectedPhoto} />
           </main>
 
-          {/* Unified Fullscreen Media Lightbox (Photos + Videos) (Section 20 & 21) */}
+          {/* Dedicated Fullscreen Photo Lightbox (strictly photos) */}
           <Suspense fallback={null}>
-            {activeMedia && (
-              <MediaLightbox
-                item={activeMedia}
-                items={allMedia}
-                onClose={() => setActiveMedia(null)}
-                onSelectItem={setActiveMedia}
+            {selectedPhoto && (
+              <PhotoLightbox
+                photo={selectedPhoto}
+                photos={photos}
+                onClose={() => setSelectedPhoto(null)}
+                onSelectPhoto={setSelectedPhoto}
+              />
+            )}
+          </Suspense>
+
+          {/* Dedicated Fullscreen Video Lightbox (strictly videos) */}
+          <Suspense fallback={null}>
+            {selectedVideo && (
+              <VideoLightbox
+                video={selectedVideo}
+                videos={videos}
+                onClose={() => setSelectedVideo(null)}
+                onSelectVideo={setSelectedVideo}
+              />
+            )}
+          </Suspense>
+
+          {/* Secret Memory Room Components (Lazy Loaded) */}
+          <Suspense fallback={null}>
+            {isSecretLockOpen && (
+              <SecretLockModal
+                isOpen={isSecretLockOpen}
+                onClose={handleCloseSecretLock}
+                onUnlocked={handleSecretUnlocked}
+              />
+            )}
+            {isSecretRoomOpen && (
+              <SecretRoom
+                isOpen={isSecretRoomOpen}
+                onLock={handleLockSecretRoom}
               />
             )}
           </Suspense>

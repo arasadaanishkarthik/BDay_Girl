@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { SITE_CONFIG } from '../data/config';
-import { photos } from '../data/mediaLoader';
+import { heroPhoto } from '../data/mediaLoader';
 import MagneticButton from '../components/MagneticButton';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -20,7 +20,7 @@ export default function Hero({ onSelectPhoto }) {
   const textRef = useRef(null);
   const [heroLoaded, setHeroLoaded] = useState(false);
 
-  const heroPhoto = photos[0];
+  // heroPhoto is pre-assigned by the central registry (photo index 0)
 
   useEffect(() => {
     const container = containerRef.current;
@@ -71,7 +71,7 @@ export default function Hero({ onSelectPhoto }) {
     <section
       id="hero"
       ref={containerRef}
-      className="relative w-full h-screen overflow-hidden flex flex-col justify-between items-center bg-[#09090b] text-white select-none"
+      className="relative w-full min-h-[100svh] h-[100svh] overflow-hidden flex flex-col justify-between items-center bg-[#09090b] text-white select-none"
     >
       {/* Background Hero Image with Progressive Blur-Up & GPU Parallax */}
       <div className="absolute inset-0 z-0 overflow-hidden bg-black">
@@ -110,28 +110,28 @@ export default function Hero({ onSelectPhoto }) {
       </div>
 
       {/* Top spacing placeholder */}
-      <div className="h-24 w-full" />
+      <div className="h-20 sm:h-24 w-full" />
 
       {/* Center Typography Letter-by-Letter for SANJANA */}
       <div
         ref={textRef}
-        className="relative z-10 flex flex-col items-center text-center px-6 max-w-4xl will-change-transform transform-gpu"
+        className="relative z-10 flex flex-col items-center text-center px-4 sm:px-6 max-w-4xl will-change-transform transform-gpu"
       >
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="flex items-center gap-3 mb-4"
+          className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4"
         >
-          <span className="w-8 h-[1px] bg-gold/60" />
-          <span className="font-serif italic text-sm md:text-base tracking-[0.25em] text-gold uppercase">
+          <span className="w-6 sm:w-8 h-[1px] bg-gold/60" />
+          <span className="font-serif italic text-xs sm:text-sm md:text-base tracking-[0.2em] sm:tracking-[0.25em] text-gold uppercase">
             A Living Digital Exhibition
           </span>
-          <span className="w-8 h-[1px] bg-gold/60" />
+          <span className="w-6 sm:w-8 h-[1px] bg-gold/60" />
         </motion.div>
 
         {/* Her Name: SANJANA */}
-        <h1 className="font-display font-light text-5xl sm:text-7xl md:text-8xl lg:text-9xl uppercase tracking-[0.2em] sm:tracking-[0.25em] text-[#faf6ee] drop-shadow-2xl overflow-hidden flex flex-wrap justify-center">
+        <h1 className="font-display font-light text-4xl sm:text-6xl md:text-8xl lg:text-9xl uppercase tracking-[0.16em] sm:tracking-[0.25em] text-[#faf6ee] drop-shadow-2xl overflow-hidden flex flex-wrap justify-center">
           {titleLetters.map((char, index) => (
             <motion.span
               key={index}

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { photos } from '../data/mediaLoader';
+import { introPhoto } from '../data/mediaLoader';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -13,7 +13,7 @@ export default function Introduction({ onSelectPhoto }) {
   const photoExpandRef = useRef(null);
   const photoWrapRef = useRef(null);
 
-  const revealPhoto = photos[1] || photos[0];
+  const revealPhoto = introPhoto;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -55,9 +55,10 @@ export default function Introduction({ onSelectPhoto }) {
 
     // Expanding First Photo Morph
     if (photo && photoWrap) {
+      const isMobile = window.innerWidth < 640;
       gsap.fromTo(
         photoWrap,
-        { width: '34%', borderRadius: '36px' },
+        { width: isMobile ? '88%' : '34%', borderRadius: isMobile ? '20px' : '36px' },
         {
           width: '100%',
           borderRadius: '0px',
@@ -96,20 +97,20 @@ export default function Introduction({ onSelectPhoto }) {
     <section
       id="introduction"
       ref={containerRef}
-      className="relative w-full py-28 md:py-44 flex flex-col items-center justify-center bg-[#09090b] text-[#f7f3eb] overflow-hidden select-none"
+      className="relative w-full py-20 sm:py-28 md:py-44 flex flex-col items-center justify-center bg-[#09090b] text-[#f7f3eb] overflow-hidden select-none"
     >
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gold/[0.03] rounded-full blur-[140px] pointer-events-none" />
 
       {/* Typography Sequence */}
-      <div className="flex flex-col items-center text-center px-6 max-w-5xl z-10 mb-20 md:mb-32">
-        <span className="text-[11px] font-mono tracking-[0.35em] uppercase text-gold/70 mb-6">
+      <div className="flex flex-col items-center text-center px-4 sm:px-6 max-w-5xl z-10 mb-14 sm:mb-20 md:mb-32">
+        <span className="text-[10px] sm:text-[11px] font-mono tracking-[0.35em] uppercase text-gold/70 mb-4 sm:mb-6">
           Chapter I • The Beginning
         </span>
 
         <div className="overflow-hidden">
           <h2
             ref={line1Ref}
-            className="font-display font-light text-4xl sm:text-6xl md:text-8xl tracking-[0.1em] text-white/90 uppercase"
+            className="font-display font-light text-3xl sm:text-6xl md:text-8xl tracking-[0.08em] sm:tracking-[0.1em] text-white/90 uppercase"
           >
             Some moments
           </h2>
@@ -118,7 +119,7 @@ export default function Introduction({ onSelectPhoto }) {
         <div className="overflow-hidden my-1 sm:my-3">
           <span
             ref={line2Ref}
-            className="font-editorial-italic font-normal text-5xl sm:text-7xl md:text-9xl text-gold tracking-wider inline-block"
+            className="font-editorial-italic font-normal text-4xl sm:text-7xl md:text-9xl text-gold tracking-wider inline-block"
           >
             deserve
           </span>
@@ -127,7 +128,7 @@ export default function Introduction({ onSelectPhoto }) {
         <div className="overflow-hidden">
           <h2
             ref={line3Ref}
-            className="font-display font-light text-4xl sm:text-6xl md:text-8xl tracking-[0.1em] text-white/90 uppercase"
+            className="font-display font-light text-3xl sm:text-6xl md:text-8xl tracking-[0.08em] sm:tracking-[0.1em] text-white/90 uppercase"
           >
             to be remembered.
           </h2>
@@ -140,8 +141,8 @@ export default function Introduction({ onSelectPhoto }) {
           <div
             ref={photoWrapRef}
             onClick={() => onSelectPhoto && onSelectPhoto(revealPhoto)}
-            className="relative h-[65vh] md:h-[85vh] overflow-hidden shadow-2xl cursor-pointer mx-auto transform-gpu will-change-transform"
-            style={{ width: '34%', borderRadius: '36px' }}
+            className="relative h-[55vh] sm:h-[65vh] md:h-[85vh] overflow-hidden shadow-2xl cursor-pointer mx-auto transform-gpu will-change-transform"
+            style={{ width: typeof window !== 'undefined' && window.innerWidth < 640 ? '88%' : '34%', borderRadius: '24px' }}
           >
             <picture>
               <source media="(min-width: 1024px)" srcSet={revealPhoto.large || revealPhoto.src} type="image/webp" />

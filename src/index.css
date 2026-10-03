@@ -10,6 +10,14 @@ html {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  width: 100%;
+  min-height: 100%;
 }
 
 /* Lenis smooth scrolling rules */
@@ -21,8 +29,9 @@ html.lenis, html.lenis body {
   scroll-behavior: auto !important;
 }
 
-.lenis.lenis-smooth [data-lenis-prevent] {
+[data-lenis-prevent] {
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .lenis.lenis-stopped {

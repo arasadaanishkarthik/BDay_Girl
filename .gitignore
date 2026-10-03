@@ -16,9 +16,7 @@ dist-ssr
 .idea
 .gemini
 
-# STRICT EXCLUSION: Private / Unwanted folder
-p/
-p/**
+# Root private folder
 /p/
 /p/**
 

@@ -15,3 +15,11 @@ export const SITE_CONFIG = {
     note: 'Ambient soundscape for an immersive exhibition'
   }
 };
+
+// Secret Memory Room Configuration (Change secret code in one place)
+export const SECRET_CONFIG = {
+  SECRET_CODE: 'sanjana', // Change your secret password here
+  INACTIVITY_TIMEOUT_MS: 15 * 60 * 1000, // 15 minutes auto-lock
+  CLICK_THRESHOLD: 5, // Clicks needed on SANJANA logo
+  CLICK_WINDOW_MS: 2000, // Time window for clicks (2 seconds)
+};

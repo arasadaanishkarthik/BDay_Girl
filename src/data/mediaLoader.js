@@ -1,67 +1,38 @@
 /**
- * Unified Dynamic Media Discovery System (Sections 7, 8, 9, 10, 11, 12, 13)
- * - Automatically discovers ANY number of photos and videos using Vite import.meta.glob
- * - STRICT EXCLUSION: Completely excludes anything inside /p/ or p/**
- * - Dynamically computes total media count (no hard-coded 30 limit)
- * - Interleaves photos and videos into a seamless cinematic story
+ * Unified Dynamic Media Discovery System — ZERO DUPLICATION
+ *
+ * CENTRAL PHOTO REGISTRY:
+ * - Every unique photo appears EXACTLY ONCE across the entire website.
+ * - Photos are pre-assigned to sections before any component renders.
+ * - Hero: photo[0]
+ * - Prologue/Intro: photo[1]
+ * - Memories (Stack): photos[2..N-3]
+ * - Birthday: photo[N-2]
+ * - Final: photo[N-1]
+ * - Deduplicated based on normalized file path (using Map).
+ *
+ * VIDEO DISCOVERY:
+ * - Only actual video files (.mp4, .webm, .mov) enter videos[].
+ * - Poster files, thumbnails, and duplicates are strictly excluded.
+ * - Exactly the actual number of video files (e.g. 2 files -> 2 cards).
  */
 
-// 1. Discover all images
-const rawImages = import.meta.glob(
-  '/src/assets/**/*.{jpg,jpeg,png,webp,avif}',
-  { eager: true, query: '?url', import: 'default' }
-);
-
-// 2. Discover all videos
-const rawVideos = import.meta.glob(
-  '/src/assets/**/*.{mp4,webm,mov}',
-  { eager: true, query: '?url', import: 'default' }
-);
-
-// Strict exclusion rule for the 'p' folder (Section 8 & 9)
-const isExcludedPath = (path) => {
-  const normalized = path.replace(/\\/g, '/');
-  return (
-    normalized.includes('/p/') ||
-    normalized.startsWith('/src/assets/p/') ||
-    normalized.startsWith('p/') ||
-    normalized.includes('/p.')
-  );
+const normalizePath = (filePath) => {
+  if (!filePath) return '';
+  return filePath.replace(/\\/g, '/').toLowerCase();
 };
 
-// Editorial caption generator based on index
-const editorialCaptions = [
-  { title: "The Archway", caption: "The doorway into sunlit reverie" },
-  { title: "Monochrome Grace", caption: "Timeless silhouettes against the hills" },
-  { title: "Heritage Reverie", caption: "In tune with ancient stone and quiet melodies" },
-  { title: "Candid Breeze", caption: "Just being herself in the open air" },
-  { title: "Quiet Contemplation", caption: "A soft pause between the hours" },
-  { title: "Violet Hues", caption: "Shades of elegance carved in time" },
-  { title: "Sunlit Pathways", caption: "Golden light touching peaceful trails" },
-  { title: "Green Hillside", caption: "Where nature mirrors pure grace" },
-  { title: "Stone Whispers", caption: "Stories etched in quiet pillars" },
-  { title: "A Gentle Glance", caption: "Unplanned, pure, and effortless" },
-  { title: "Ancient Echoes", caption: "Modern dreams amidst historic arches" },
-  { title: "Golden Hour", caption: "When the sky paints everything in amber" },
-  { title: "Soft Focus", caption: "Little moments that hold big emotions" },
-  { title: "Laughter Caught", caption: "A flash of pure, infectious joy" },
-  { title: "Wanderer’s Solace", caption: "Finding stillness in sprawling heights" },
-  { title: "Candid Stillness", caption: "The quiet art of being present" },
-  { title: "Festive Evening", caption: "Glittering lights and shimmering threads" },
-  { title: "Whisper of Wind", caption: "Loose hair dancing with the hill breeze" },
-  { title: "Cave Alcove", caption: "Stepping lightly through sheltered history" },
-  { title: "Radiant Mood", caption: "Another memory to keep forever" },
-  { title: "Steps of Time", caption: "Every climb has its own rhythm" },
-  { title: "Midsummer Afternoon", caption: "Sun warmth lingering on leaves" },
-  { title: "Shadow & Light", caption: "Intimate contrasts of shade and sun" },
-  { title: "Casual Grace", caption: "Effortless poise, natural beauty" },
-  { title: "Serenity", caption: "Calm eyes seeing through the horizon" },
-  { title: "Temple Ridge", caption: "High stone overlooking the valley" },
-  { title: "Spontaneous Smile", caption: "The charm that brightens the room" },
-  { title: "Verdant Breeze", caption: "Lush green contrasts and deep purples" },
-  { title: "A Glimpse Beyond", caption: "Looking forward with hope and light" },
-  { title: "Living Memory", caption: "Moments held forever in stillness" },
-];
+// Strict exclusion rule for the 'p' folder (Requirement 8)
+const isExcludedPath = (path) => {
+  const norm = normalizePath(path);
+  return (
+    norm.includes('/p/') ||
+    norm.startsWith('/src/assets/p/') ||
+    norm.startsWith('p/') ||
+    norm.includes('/p.') ||
+    norm.includes('/secret/')
+  );
+};
 
 // Helper to extract base filename (e.g. photo01)
 const getBaseName = (filePath) => {
@@ -70,113 +41,177 @@ const getBaseName = (filePath) => {
   return filename.substring(0, filename.lastIndexOf('.')) || filename;
 };
 
-// 3. Process filtered images (never include p/)
-export const photos = Object.entries(rawImages)
-  .filter(([path]) => !isExcludedPath(path))
-  .sort(([a], [b]) => a.localeCompare(b))
-  .map(([path, url], index) => {
+// ─── 1. EDITORIAL CAPTIONS ────────────────────────────────────────────────────
+const editorialCaptions = [
+  { title: 'The Archway', caption: 'The doorway into sunlit reverie' },
+  { title: 'Monochrome Grace', caption: 'Timeless silhouettes against the hills' },
+  { title: 'Heritage Reverie', caption: 'In tune with ancient stone and quiet melodies' },
+  { title: 'Candid Breeze', caption: 'Just being herself in the open air' },
+  { title: 'Quiet Contemplation', caption: 'A soft pause between the hours' },
+  { title: 'Violet Hues', caption: 'Shades of elegance carved in time' },
+  { title: 'Sunlit Pathways', caption: 'Golden light touching peaceful trails' },
+  { title: 'Green Hillside', caption: 'Where nature mirrors pure grace' },
+  { title: 'Stone Whispers', caption: 'Stories etched in quiet pillars' },
+  { title: 'A Gentle Glance', caption: 'Unplanned, pure, and effortless' },
+  { title: 'Ancient Echoes', caption: 'Modern dreams amidst historic arches' },
+  { title: 'Golden Hour', caption: 'When the sky paints everything in amber' },
+  { title: 'Soft Focus', caption: 'Little moments that hold big emotions' },
+  { title: 'Laughter Caught', caption: 'A flash of pure, infectious joy' },
+  { title: "Wanderer's Solace", caption: 'Finding stillness in sprawling heights' },
+  { title: 'Candid Stillness', caption: 'The quiet art of being present' },
+  { title: 'Festive Evening', caption: 'Glittering lights and shimmering threads' },
+  { title: 'Whisper of Wind', caption: 'Loose hair dancing with the hill breeze' },
+  { title: 'Cave Alcove', caption: 'Stepping lightly through sheltered history' },
+  { title: 'Radiant Mood', caption: 'Another memory to keep forever' },
+  { title: 'Steps of Time', caption: 'Every climb has its own rhythm' },
+  { title: 'Midsummer Afternoon', caption: 'Sun warmth lingering on leaves' },
+  { title: 'Shadow & Light', caption: 'Intimate contrasts of shade and sun' },
+  { title: 'Casual Grace', caption: 'Effortless poise, natural beauty' },
+  { title: 'Serenity', caption: 'Calm eyes seeing through the horizon' },
+  { title: 'Temple Ridge', caption: 'High stone overlooking the valley' },
+  { title: 'Spontaneous Smile', caption: 'The charm that brightens the room' },
+  { title: 'Verdant Breeze', caption: 'Lush green contrasts and deep purples' },
+  { title: 'A Glimpse Beyond', caption: 'Looking forward with hope and light' },
+  { title: 'Living Memory', caption: 'Moments held forever in stillness' },
+  { title: 'Still Waters', caption: 'Reflecting beauty in every moment' },
+  { title: 'Evening Grace', caption: 'The day fading into warmth' },
+  { title: 'Morning Light', caption: 'First hours painted in gold' },
+  { title: 'Timeless Portrait', caption: 'A frame worthy of forever' },
+  { title: 'The Final Frame', caption: 'One last look, one last breath' },
+];
+
+// ─── 2. DISCOVER PHOTOS FROM src/assets/photos/ ─────────────────────────────
+const rawImages = import.meta.glob(
+  '/src/assets/photos/*.{jpg,jpeg,png,webp,avif}',
+  { eager: true, query: '?url', import: 'default' }
+);
+
+// Deduplicate based on normalized file path (Requirement 9)
+const uniquePhotosMap = new Map();
+Object.entries(rawImages).forEach(([path, url]) => {
+  if (isExcludedPath(path)) return;
+  const key = normalizePath(path);
+  if (!uniquePhotosMap.has(key)) {
+    uniquePhotosMap.set(key, { path, url });
+  }
+});
+
+const rawPhotoList = Array.from(uniquePhotosMap.values())
+  .sort((a, b) => a.path.localeCompare(b.path))
+  .map(({ path, url }, index) => {
     const base = getBaseName(path);
     const meta = editorialCaptions[index % editorialCaptions.length];
     const num = index + 1;
-
-    // Use optimized WebP if it exists in public/images/thumbnails/
     const hasOptimized = /photo\d+/i.test(base);
-    const thumbnail = hasOptimized ? `/images/thumbnails/${base}.webp` : url;
-    const medium = hasOptimized ? `/images/medium/${base}.webp` : url;
-    const large = hasOptimized ? `/images/large/${base}.webp` : url;
-    const blur = hasOptimized ? `/images/blur/${base}.webp` : url;
 
     return {
       id: `img-${num}`,
       index: num,
       type: 'image',
       src: url,
-      thumbnail,
-      medium,
-      large,
-      blur,
+      thumbnail: hasOptimized ? `/images/thumbnails/${base}.webp` : url,
+      medium: hasOptimized ? `/images/medium/${base}.webp` : url,
+      large: hasOptimized ? `/images/large/${base}.webp` : url,
+      blur: hasOptimized ? `/images/blur/${base}.webp` : url,
       title: meta.title,
       caption: meta.caption,
-      aspect: 'portrait'
+      aspect: 'portrait',
     };
   });
 
-// 4. Process filtered videos (never include p/)
-export const videos = Object.entries(rawVideos)
-  .filter(([path]) => !isExcludedPath(path))
-  .sort(([a], [b]) => a.localeCompare(b))
-  .map(([path, url], index) => {
-    const base = getBaseName(path);
-    const num = index + 1;
-    const poster = `/videos/posters/video${String(num).padStart(2, '0')}.webp`;
+// ─── 3. CENTRAL PHOTO REGISTRY — ZERO DUPLICATION ────────────────────────────
+// Assignment (for N total photos):
+//   index 0        → heroPhoto
+//   index 1        → introPhoto
+//   index N-2      → birthdayPhoto  (second-to-last)
+//   index N-1      → finalPhoto     (last)
+//   indices 2..N-3 → galleryPhotos  (all remaining, shown only in Memories stack)
 
-    return {
-      id: `vid-${num}`,
-      index: num,
-      type: 'video',
+const _total = rawPhotoList.length;
+
+export const heroPhoto     = _total > 0 ? rawPhotoList[0] : null;
+export const introPhoto    = _total > 1 ? rawPhotoList[1] : rawPhotoList[0] || null;
+export const finalPhoto    = _total > 2 ? rawPhotoList[_total - 1] : rawPhotoList[0] || null;
+export const birthdayPhoto = _total > 3 ? rawPhotoList[_total - 2] : rawPhotoList[0] || null;
+
+// Gallery: indices 2 through (_total - 3) inclusive (everything except hero, intro, birthday, final)
+const _galleryEnd = _total > 4 ? _total - 2 : _total; // exclusive index
+export const galleryPhotos = rawPhotoList.slice(2, _galleryEnd);
+
+// Full photo array — used by lightbox navigation for photos
+export const photos = rawPhotoList;
+
+export const totalPhotos = rawPhotoList.length;
+export const totalGalleryPhotos = galleryPhotos.length;
+
+// ─── 4. DISCOVER VIDEOS (ONLY ACTUAL VIDEO FILES) ───────────────────────────
+// Requirements 12, 13, 14, 15:
+// - Only .mp4, .webm, .mov
+// - Do NOT treat images or posters as videos
+// - Deduplicate before rendering
+// - Exactly the number of actual videos
+
+const videoTitles = [
+  { title: 'Heritage Whisper', caption: 'Ancient stone walls and gentle laughter in motion' },
+  { title: 'Sunlit Hillside',  caption: 'Wind dancing through the green cliffs' },
+];
+
+const rawVideos = import.meta.glob(
+  '/src/assets/videos/*.{mp4,webm,mov}',
+  { eager: true, query: '?url', import: 'default' }
+);
+
+const uniqueVideosMap = new Map();
+Object.entries(rawVideos).forEach(([path, url]) => {
+  if (isExcludedPath(path)) return;
+  const base = getBaseName(path);
+  const key = base.toLowerCase();
+  if (!uniqueVideosMap.has(key)) {
+    uniqueVideosMap.set(key, {
+      path,
       src: url,
-      poster,
-      title: num === 1 ? "Heritage Whisper" : num === 2 ? "Sunlit Hillside" : `Living Moment ${num}`,
-      caption: num === 1 ? "Ancient stone walls and gentle laughter in motion" : "Wind dancing through the green cliffs",
-      aspect: 'portrait'
-    };
-  });
-
-// Fallback videos from public/videos if rawVideos is empty
-if (videos.length === 0) {
-  videos.push(
-    {
-      id: 'vid-1',
-      index: 1,
-      type: 'video',
-      src: '/videos/video01.mp4',
-      poster: '/videos/posters/video01.webp',
-      title: 'Heritage Whisper',
-      caption: 'Ancient stone walls and gentle laughter in motion',
-      aspect: 'portrait'
-    },
-    {
-      id: 'vid-2',
-      index: 2,
-      type: 'video',
-      src: '/videos/video02.mp4',
-      poster: '/videos/posters/video02.webp',
-      title: 'Sunlit Hillside',
-      caption: 'Wind dancing through the green cliffs',
-      aspect: 'portrait'
-    }
-  );
-}
-
-// 5. Interleave Photos & Videos into a single unified media story (Section 12, 14)
-// Structure: 2-3 photos, then 1 video, then photos, then video...
-export const allMedia = [];
-let vIdx = 0;
-photos.forEach((photo, idx) => {
-  allMedia.push(photo);
-  // Interleave a video every 4 photos if videos are available
-  if ((idx + 1) % 4 === 0 && vIdx < videos.length) {
-    allMedia.push(videos[vIdx]);
-    vIdx++;
+      base,
+    });
   }
 });
 
-// If any remaining videos, append them naturally
-while (vIdx < videos.length) {
-  allMedia.push(videos[vIdx]);
-  vIdx++;
+// Fallback to public/videos/ if glob returned empty
+if (uniqueVideosMap.size === 0) {
+  ['video01', 'video02'].forEach((base) => {
+    uniqueVideosMap.set(base, {
+      path: `/videos/${base}.mp4`,
+      src: `/videos/${base}.mp4`,
+      base,
+    });
+  });
 }
 
-// Export dynamic totals
-export const totalPhotos = photos.length;
-export const totalVideos = videos.length;
-export const totalMedia = allMedia.length;
+export const videos = Array.from(uniqueVideosMap.values())
+  .sort((a, b) => a.base.localeCompare(b.base))
+  .map((v, index) => {
+    const num = index + 1;
+    const base = v.base;
+    const meta = videoTitles[index % videoTitles.length];
+    return {
+      id: `video-0${num}`,
+      index: num,
+      type: 'video',
+      src: v.src,
+      poster: `/videos/posters/${base}.webp`,
+      title: meta?.title || `Living Moment ${num}`,
+      caption: meta?.caption || 'Moments held in motion',
+      description: meta?.caption || 'Moments held in motion',
+      aspect: 'landscape',
+    };
+  });
 
-// Formatter for dynamic counters (Section 13)
-export const formatMediaCounter = (currentIdx, total = totalMedia) => {
+export const totalVideos = videos.length;
+
+// Formatter for dynamic counters
+export const formatMediaCounter = (currentIdx, total = totalPhotos) => {
   const currentStr = String(currentIdx + 1).padStart(2, '0');
-  const totalStr = String(total).padStart(2, '0');
+  const totalStr   = String(total).padStart(2, '0');
   return `${currentStr} / ${totalStr}`;
 };
 
-export default allMedia;
+export default photos;

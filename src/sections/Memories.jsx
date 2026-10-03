@@ -1,100 +1,303 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import gsap from 'gsap';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { photos, totalPhotos } from '../data/mediaLoader';
+import { galleryPhotos } from '../data/mediaLoader';
 
 /**
- * Ultra-Optimized Virtualized Polaroid Stack (Sections 3, 4, 5, 6, 24, 30)
- * - Renders MAXIMUM 5 to 7 cards in the DOM at any time
- * - Zero continuous requestAnimationFrame loops
- * - Zero multi-axis per-frame GSAP scrub thrashing
- * - Static pre-computed offsets when idle
- * - Supports ANY number of photos (20, 50, 100, 200+)
- * - Instant 60 FPS scrolling and buttery-smooth card transitions
+ * Chapter II: Moments Suspended — Wide Horizontal Film Strip Stream (Left to Right)
+ *
+ * Requirements 1 to 14:
+ * - Wide horizontal composition stretching across the viewport width.
+ * - Visual flow: LEFT → CENTER → RIGHT.
+ * - 7 active positions: [-3, -2, -1, 0, 1, 2, 3].
+ *   [small] [small] [medium] [MAIN PHOTO] [medium] [small] [small]
+ * - Main photo in center: scale 1, opacity 1, dominant.
+ * - Surrounding photos progressively smaller and softer.
+ * - Smooth GSAP power3.out transitions (0.85s).
+ * - Automatic progression every ~4s, pausing on interaction.
+ * - Desktop drag & mobile swipe (drag left -> next, drag right -> prev).
+ * - Dynamic photo counter (e.g. 01 / 31).
+ * - Exactly 7 active cards in DOM, zero duplicates.
  */
 export default function Memories({ onSelectPhoto }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(1);
-  const containerRef = useRef(null);
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1200
+  );
 
-  const maxVisibleCards = 6; // Sections 4 & 30: 5–7 cards maximum
-  const total = photos.length;
+  const containerRef    = useRef(null);
+  const stageRef        = useRef(null);
+  const cardRefs        = useRef(new Map());
+  const autoSlideTimer  = useRef(null);
+  const resumeTimer     = useRef(null);
+  const isInteracting   = useRef(false);
+  const isVisible       = useRef(false);
 
-  const handleNext = () => {
+  // Drag tracking
+  const dragStartX      = useRef(null);
+  const dragStartY      = useRef(null);
+  const isDragging      = useRef(false);
+
+  const total = galleryPhotos.length;
+
+  // Track window resize for fluid responsive positioning across viewports
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Navigation handlers
+  const handleNext = useCallback(() => {
+    if (total === 0) return;
     setDirection(1);
     setCurrentIndex((prev) => (prev + 1) % total);
-  };
-
-  const handlePrev = () => {
-    setDirection(-1);
-    setCurrentIndex((prev) => (prev - 1 + total) % total);
-  };
-
-  // Keyboard navigation when hovered/focused
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'ArrowRight') handleNext();
-      if (e.key === 'ArrowLeft') handlePrev();
-    };
-
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('keydown', handleKeyDown);
-      return () => container.removeEventListener('keydown', handleKeyDown);
-    }
   }, [total]);
 
-  // Windowed virtual slice of exactly 5–6 items around currentIndex
-  const visibleCards = [];
-  for (let i = 0; i < Math.min(maxVisibleCards, total); i++) {
-    const photoIdx = (currentIndex + i) % total;
-    visibleCards.push({
-      photo: photos[photoIdx],
-      stackRank: i, // 0 is top active card, 1 is behind it, etc.
-      index: photoIdx
-    });
-  }
+  const handlePrev = useCallback(() => {
+    if (total === 0) return;
+    setDirection(-1);
+    setCurrentIndex((prev) => (prev - 1 + total) % total);
+  }, [total]);
 
-  // Pre-calculated static stack styles (GPU transforms only)
-  const getStackStyle = (rank) => {
-    // Top card (rank 0)
-    if (rank === 0) {
+  // Pause auto-sliding on interaction and resume after 6s of idle
+  const pauseAutoSlide = useCallback(() => {
+    isInteracting.current = true;
+    if (autoSlideTimer.current) clearInterval(autoSlideTimer.current);
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+
+    resumeTimer.current = setTimeout(() => {
+      isInteracting.current = false;
+      startAutoSlide();
+    }, 6000);
+  }, []);
+
+  // Auto-slide loop (4 seconds)
+  const startAutoSlide = useCallback(() => {
+    if (autoSlideTimer.current) clearInterval(autoSlideTimer.current);
+    autoSlideTimer.current = setInterval(() => {
+      if (!isInteracting.current && isVisible.current) {
+        setDirection(1);
+        setCurrentIndex((prev) => (prev + 1) % total);
+      }
+    }, 4000);
+  }, [total]);
+
+  // Viewport intersection observer: only auto-slide when section is in view
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isVisible.current = entry.isIntersecting;
+          if (entry.isIntersecting) {
+            startAutoSlide();
+          } else {
+            if (autoSlideTimer.current) clearInterval(autoSlideTimer.current);
+          }
+        });
+      },
+      { threshold: 0.2 }
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      if (autoSlideTimer.current) clearInterval(autoSlideTimer.current);
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    };
+  }, [startAutoSlide]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (!isVisible.current) return;
+      if (e.key === 'ArrowRight') {
+        pauseAutoSlide();
+        handleNext();
+      } else if (e.key === 'ArrowLeft') {
+        pauseAutoSlide();
+        handlePrev();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleNext, handlePrev, pauseAutoSlide]);
+
+  // ─── RESPONSIVE CARD OFFSETS (Mobile: 3 cards, Desktop: 7 cards) ────────
+  const isMobileView = windowWidth < 640;
+  const visibleOffsets = isMobileView
+    ? [-1, 0, 1] // Requirement 12: exactly 3 cards on mobile!
+    : total >= 7
+    ? [-3, -2, -1, 0, 1, 2, 3]
+    : total >= 5
+    ? [-2, -1, 0, 1, 2]
+    : total >= 3
+    ? [-1, 0, 1]
+    : [0];
+
+  const visibleCards = visibleOffsets.map((offset) => {
+    const photoIdx = ((currentIndex + offset) % total + total) % total;
+    return {
+      photo: galleryPhotos[photoIdx],
+      offset,
+      photoIndex: photoIdx,
+    };
+  });
+
+  // Calculate position parameters across the viewport
+  const getSlotParams = useCallback((offset, width) => {
+    const isMobile = width < 640;
+    const isTablet = width >= 640 && width < 1024;
+
+    // Step spacing between cards (responsive across monitor sizes)
+    const step = isMobile
+      ? Math.min(95, Math.max(65, width * 0.24))
+      : isTablet
+      ? Math.max(140, width * 0.22)
+      : Math.min(320, Math.max(200, width * 0.19));
+
+    if (offset === 0) {
+      // Position 0 = MAIN PHOTO: center, dominant, upright
       return {
-        transform: 'translate3d(0px, 0px, 0px) rotate(0deg) scale(1)',
-        zIndex: 30,
+        x: 0,
+        y: 0,
+        scale: 1,
+        rotation: 0,
         opacity: 1,
+        zIndex: 40,
       };
     }
-    // Cards behind: stacked with subtle static rotation and gentle scale down
-    const rotList = [-3, 3.5, -4.5, 4, -2];
-    const yOffsets = [0, 14, 28, 42, 56];
-    const xOffsets = [0, -8, 10, -12, 14];
-    const scales = [1, 0.96, 0.92, 0.88, 0.84];
-    const opacities = [1, 0.9, 0.75, 0.55, 0.35];
 
-    const rot = rotList[(rank - 1) % rotList.length];
-    const y = yOffsets[rank] || 50;
-    const x = xOffsets[rank] || 0;
-    const scale = scales[rank] || 0.8;
-    const opacity = opacities[rank] || 0.3;
+    const sign = offset > 0 ? 1 : -1;
+    const abs = Math.abs(offset);
 
+    if (abs === 1) {
+      // Position ±1: MEDIUM, near center
+      return {
+        x: sign * step,
+        y: isMobile ? 8 : 10,
+        scale: isMobile ? 0.85 : 0.88,
+        rotation: sign * 3,
+        opacity: 0.78,
+        zIndex: 30,
+      };
+    }
+
+    if (abs === 2) {
+      // Position ±2: SMALL, mid distance
+      return {
+        x: sign * step * 1.9,
+        y: isMobile ? 16 : 20,
+        scale: isMobile ? 0.72 : 0.76,
+        rotation: sign * 6,
+        opacity: 0.5,
+        zIndex: 20,
+      };
+    }
+
+    // Position ±3: SMALL, outer edges (entering/exiting)
     return {
-      transform: `translate3d(${x}px, ${y}px, 0px) rotate(${rot}deg) scale(${scale})`,
-      zIndex: 30 - rank,
-      opacity,
+      x: sign * step * 2.7,
+      y: isMobile ? 22 : 28,
+      scale: isMobile ? 0.6 : 0.64,
+      rotation: sign * 9,
+      opacity: 0.25,
+      zIndex: 10,
     };
+  }, []);
+
+  // ─── GSAP TRANSITION ON INDEX CHANGE ──────────────────────────────────────
+  useEffect(() => {
+    visibleCards.forEach(({ photo, offset }) => {
+      const el = cardRefs.current.get(photo.id);
+      if (!el) return;
+
+      const target = getSlotParams(offset, windowWidth);
+
+      // Hardware-accelerated smooth slide with GSAP power3.out
+      gsap.to(el, {
+        x: target.x,
+        y: target.y,
+        scale: target.scale,
+        rotation: target.rotation,
+        opacity: target.opacity,
+        duration: 0.85,
+        ease: 'power3.out',
+        overwrite: 'auto',
+      });
+
+      el.style.zIndex = target.zIndex;
+    });
+  }, [currentIndex, windowWidth, getSlotParams]);
+
+  // Pointer / Drag / Swipe interactions
+  const handlePointerDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    const clientX = e.clientX ?? (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY ?? (e.touches && e.touches[0].clientY);
+    dragStartX.current = clientX;
+    dragStartY.current = clientY;
+    isDragging.current = true;
+    pauseAutoSlide();
   };
+
+  const handlePointerUp = (e) => {
+    if (!isDragging.current || dragStartX.current === null) return;
+    const clientX = e.clientX ?? (e.changedTouches && e.changedTouches[0].clientX);
+    const clientY = e.clientY ?? (e.changedTouches && e.changedTouches[0].clientY);
+    const diffX = clientX - dragStartX.current;
+    const diffY = clientY - (dragStartY.current || 0);
+
+    isDragging.current = false;
+    dragStartX.current = null;
+    dragStartY.current = null;
+
+    // Horizontal drag threshold
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+      if (diffX < 0) {
+        handleNext(); // Drag left -> next photo
+      } else {
+        handlePrev(); // Drag right -> prev photo
+      }
+    }
+  };
+
+  const handleCardClick = (offset, photo) => {
+    pauseAutoSlide();
+    if (offset === 0) {
+      // Main Center Card: open in fullscreen lightbox
+      if (onSelectPhoto) onSelectPhoto(photo);
+    } else {
+      // Surrounding Card: animate that card to the center main slot
+      setDirection(offset > 0 ? 1 : -1);
+      setCurrentIndex((prev) => ((prev + offset) % total + total) % total);
+    }
+  };
+
+  if (total === 0) return null;
 
   return (
     <section
       id="memories"
       ref={containerRef}
-      className="relative w-full min-h-[95vh] py-24 md:py-32 bg-[#0c0c10] text-[#f7f3eb] overflow-hidden select-none flex flex-col items-center justify-between"
+      onMouseEnter={pauseAutoSlide}
+      onMouseLeave={() => {
+        isInteracting.current = false;
+        startAutoSlide();
+      }}
+      className="relative w-full min-h-[95vh] py-24 md:py-36 bg-[#0c0c10] text-[#f7f3eb] overflow-hidden select-none flex flex-col items-center justify-between"
     >
-      {/* Background glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gold/[0.03] rounded-full blur-[120px] pointer-events-none" />
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gold/[0.035] rounded-full blur-[150px] pointer-events-none" />
 
-      {/* Header */}
-      <div className="z-10 text-center px-6 max-w-2xl">
+      {/* Section Header */}
+      <div className="z-10 text-center px-6 max-w-2xl mb-2">
         <span className="text-[11px] font-mono tracking-[0.35em] uppercase text-gold/80 mb-2 block">
           Chapter II • Constellation
         </span>
@@ -102,55 +305,66 @@ export default function Memories({ onSelectPhoto }) {
           Moments Suspended
         </h2>
         <p className="font-serif italic text-white/60 text-sm md:text-base mt-2">
-          Flip through her living memory stack
+          "Each photograph a chapter, traveling through time."
         </p>
       </div>
 
-      {/* Virtualized Polaroid Stack Stage */}
-      <div className="relative w-full max-w-md h-[460px] sm:h-[520px] flex items-center justify-center my-8 z-10">
-        {visibleCards.map(({ photo, stackRank, index }) => {
-          const isTop = stackRank === 0;
-          const style = getStackStyle(stackRank);
+      {/* ─── WIDE HORIZONTAL FILM STRIP STAGE (LEFT → CENTER → RIGHT) ───── */}
+      <div
+        ref={stageRef}
+        onMouseDown={handlePointerDown}
+        onMouseUp={handlePointerUp}
+        onTouchStart={handlePointerDown}
+        onTouchEnd={handlePointerUp}
+        className="relative w-full h-[470px] sm:h-[530px] md:h-[590px] flex items-center justify-center my-4 z-10 cursor-grab active:cursor-grabbing touch-pan-y overflow-visible"
+      >
+        {visibleCards.map(({ photo, offset, photoIndex }) => {
+          const isMain = offset === 0;
+          const initialParams = getSlotParams(offset, windowWidth);
 
           return (
             <div
               key={photo.id}
-              style={style}
-              onClick={() => {
-                if (isTop) {
-                  onSelectPhoto(photo);
-                } else {
-                  handleNext();
-                }
+              ref={(el) => {
+                if (el) cardRefs.current.set(photo.id, el);
+                else cardRefs.current.delete(photo.id);
               }}
-              className={`absolute w-[280px] sm:w-[320px] md:w-[340px] bg-[#16161f] p-3 pb-6 rounded-md border border-white/15 shadow-2xl transition-all duration-300 ease-out cursor-pointer transform-gpu ${
-                isTop ? 'hover:border-gold shadow-[0_20px_50px_rgba(0,0,0,0.8)]' : 'pointer-events-auto'
+              onClick={() => handleCardClick(offset, photo)}
+              style={{
+                zIndex: initialParams.zIndex,
+                transform: `translate3d(${initialParams.x}px, ${initialParams.y}px, 0px) scale(${initialParams.scale}) rotate(${initialParams.rotation}deg)`,
+                opacity: initialParams.opacity,
+              }}
+              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[210px] sm:w-[270px] md:w-[25vw] md:max-w-[350px] bg-[#14141d] p-3 pb-5 rounded-xl border transition-colors duration-300 shadow-2xl transform-gpu will-change-transform ${
+                isMain
+                  ? 'border-gold/60 shadow-[0_25px_60px_rgba(0,0,0,0.85)] cursor-pointer'
+                  : 'border-white/10 hover:border-white/30 cursor-pointer pointer-events-auto'
               }`}
             >
-              {/* Photo Area */}
-              <div className="relative aspect-[3/4] w-full overflow-hidden rounded-[3px] bg-black">
+              {/* Photo Frame */}
+              <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-black">
                 <picture>
                   <source media="(min-width: 1024px)" srcSet={photo.medium} type="image/webp" />
                   <img
                     src={photo.thumbnail}
                     alt={photo.title}
-                    loading={isTop ? 'eager' : 'lazy'}
+                    loading={isMain ? 'eager' : 'lazy'}
                     decoding="async"
-                    className="w-full h-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-102"
+                    className="w-full h-full object-cover object-center transition-transform duration-500 ease-out"
                   />
                 </picture>
 
-                {/* Subtle vignette */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-40 pointer-events-none" />
+                {/* Vignette */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-50 pointer-events-none" />
 
-                {/* Dynamic Frame Counter Badge (Section 13) */}
-                <div className="absolute top-3 left-3 px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-sm border border-white/15 text-[9px] font-mono tracking-widest text-gold uppercase">
-                  {String(index + 1).padStart(2, '0')} / {String(totalPhotos).padStart(2, '0')}
+                {/* Photo Badge */}
+                <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md border border-white/15 text-[9px] font-mono tracking-widest text-gold uppercase pointer-events-none">
+                  {String(photoIndex + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
                 </div>
               </div>
 
               {/* Polaroid Footer */}
-              <div className="mt-3 px-1 flex flex-col">
+              <div className="mt-3 px-1 flex flex-col pointer-events-none">
                 <span className="font-display text-base text-white/95 font-medium truncate">
                   {photo.title}
                 </span>
@@ -163,27 +377,40 @@ export default function Memories({ onSelectPhoto }) {
         })}
       </div>
 
-      {/* Bottom Interactive Controls */}
-      <div className="z-10 flex items-center gap-6">
-        <button
-          onClick={handlePrev}
-          aria-label="Previous photograph"
-          className="w-12 h-12 rounded-full border border-white/20 bg-[#121218] hover:border-gold hover:text-gold text-white/80 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
+      {/* ─── BOTTOM CONTROLS & DYNAMIC COUNTER ────────────────────────────── */}
+      <div className="z-10 flex flex-col items-center gap-3">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => {
+              pauseAutoSlide();
+              handlePrev();
+            }}
+            aria-label="Previous photograph"
+            className="w-12 h-12 min-h-[44px] min-w-[44px] rounded-full border border-white/20 bg-[#121218] hover:border-gold hover:text-gold text-white/80 transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-md"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
 
-        <span className="font-mono text-xs tracking-[0.25em] text-gold uppercase">
-          {String(currentIndex + 1).padStart(2, '0')} / {String(totalPhotos).padStart(2, '0')}
-        </span>
+          {/* Dynamic Photo Counter (Requirement 13: 01 / TOTAL) */}
+          <span className="font-mono text-xs tracking-[0.25em] text-gold uppercase select-none">
+            {String(currentIndex + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+          </span>
 
-        <button
-          onClick={handleNext}
-          aria-label="Next photograph"
-          className="w-12 h-12 rounded-full border border-white/20 bg-[#121218] hover:border-gold hover:text-gold text-white/80 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
+          <button
+            onClick={() => {
+              pauseAutoSlide();
+              handleNext();
+            }}
+            aria-label="Next photograph"
+            className="w-12 h-12 min-h-[44px] min-w-[44px] rounded-full border border-white/20 bg-[#121218] hover:border-gold hover:text-gold text-white/80 transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-md"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        <p className="font-serif italic text-[11px] text-white/40 tracking-wider">
+          Swipe or click cards to travel through moments
+        </p>
       </div>
     </section>
   );
