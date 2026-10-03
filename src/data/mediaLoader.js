@@ -96,6 +96,8 @@ Object.entries(rawImages).forEach(([path, url]) => {
   }
 });
 
+const BASE_URL = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') + '/';
+
 const rawPhotoList = Array.from(uniquePhotosMap.values())
   .sort((a, b) => a.path.localeCompare(b.path))
   .map(({ path, url }, index) => {
@@ -109,10 +111,10 @@ const rawPhotoList = Array.from(uniquePhotosMap.values())
       index: num,
       type: 'image',
       src: url,
-      thumbnail: hasOptimized ? `/images/thumbnails/${base}.webp` : url,
-      medium: hasOptimized ? `/images/medium/${base}.webp` : url,
-      large: hasOptimized ? `/images/large/${base}.webp` : url,
-      blur: hasOptimized ? `/images/blur/${base}.webp` : url,
+      thumbnail: hasOptimized ? `${BASE_URL}images/thumbnails/${base}.webp` : url,
+      medium: hasOptimized ? `${BASE_URL}images/medium/${base}.webp` : url,
+      large: hasOptimized ? `${BASE_URL}images/large/${base}.webp` : url,
+      blur: hasOptimized ? `${BASE_URL}images/blur/${base}.webp` : url,
       title: meta.title,
       caption: meta.caption,
       aspect: 'portrait',
@@ -179,8 +181,8 @@ Object.entries(rawVideos).forEach(([path, url]) => {
 if (uniqueVideosMap.size === 0) {
   ['video01', 'video02'].forEach((base) => {
     uniqueVideosMap.set(base, {
-      path: `/videos/${base}.mp4`,
-      src: `/videos/${base}.mp4`,
+      path: `${BASE_URL}videos/${base}.mp4`,
+      src: `${BASE_URL}videos/${base}.mp4`,
       base,
     });
   });
@@ -197,7 +199,7 @@ export const videos = Array.from(uniqueVideosMap.values())
       index: num,
       type: 'video',
       src: v.src,
-      poster: `/videos/posters/${base}.webp`,
+      poster: `${BASE_URL}videos/posters/${base}.webp`,
       title: meta?.title || `Living Moment ${num}`,
       caption: meta?.caption || 'Moments held in motion',
       description: meta?.caption || 'Moments held in motion',
