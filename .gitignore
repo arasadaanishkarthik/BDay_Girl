@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Production build
+dist
+dist-ssr
+*.local
+
+# Environment & IDE
+.env
+.env.*
+.DS_Store
+.vscode
+.idea
+.gemini
+
+# STRICT EXCLUSION: Private / Unwanted folder
+p/
+p/**
+/p/
+/p/**
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
